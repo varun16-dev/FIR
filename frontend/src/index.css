@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+}
+.badge-verified { @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
+.badge-tampered { @apply bg-red-500/20 text-red-400 border border-red-500/30; }
+.badge-pending { @apply bg-amber-500/20 text-amber-400 border border-amber-500/30; }
+.badge-high { @apply bg-red-500/20 text-red-400; }
+.badge-medium { @apply bg-amber-500/20 text-amber-400; }
+.badge-low { @apply bg-emerald-500/20 text-emerald-400; }
+.badge-critical { @apply bg-red-600/30 text-red-300 border border-red-500/40; }
+
+/* Button styles */
+.btn-primary {
+  @apply bg-vault-600 hover:bg-vault-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 shadow-lg shadow-vault-600/25 hover:shadow-vault-600/40;
+}
+.btn-secondary {
+  @apply bg-dark-700 hover:bg-dark-600 text-dark-200 font-medium px-4 py-2 rounded-lg transition-all duration-200 border border-dark-600;
+}
+.btn-danger {
+  @apply bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium px-4 py-2 rounded-lg transition-all duration-200 border border-red-600/30;
+}
+.btn-success {
+  @apply bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 font-medium px-4 py-2 rounded-lg transition-all duration-200 border border-emerald-600/30;
+}
+
+/* Card hover effect */
+.hover-lift {
+  @apply transition-all duration-300;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Custom tooltip */
+.tooltip-dark {
+  @apply bg-dark-800 text-dark-200 text-xs px-2 py-1 rounded border border-dark-600;
+}
+
+/* React Flow custom styles */
+.react-flow__node {
+  border-radius: 8px !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  background: rgba(30, 41, 59, 0.9) !important;
+  color: #e2e8f0 !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+}
+.react-flow__edge-path {
+  stroke: #6366f1 !important;
+  stroke-width: 2 !important;
+}
+.react-flow__background {
+  background-color: #0f172a !important;
+}
