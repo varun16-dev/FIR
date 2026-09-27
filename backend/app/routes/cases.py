@@ -794,3 +794,66 @@ def advance_case_stage(
 
     return {"message": f"Case advanced to stage {stage_id}", "status": case.status}
 
+
+# =========================================================================
+# 5. National CCTNS & ICJS Integration Endpoints
+# =========================================================================
+from app.services.cctns_icjs import CCTNS_ICJS_Adapter
+
+
+@router.get("/{case_id}/cctns-packet")
+def get_case_cctns_packet(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.read", "reports.generate")),
+    db: Session = Depends(get_db),
+):
+    """Generates standardized NCRB CCTNS CAS Integrated Investigation Form (IIF-I / IIF-V) Data Packet."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    evidence_items = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+    return CCTNS_ICJS_Adapter.generate_cctns_packet(case=case, evidence_items=evidence_items)
+
+
+@router.post("/{case_id}/cctns-sync")
+def sync_case_to_cctns(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.write", "cases.read")),
+    db: Session = Depends(get_db),
+):
+    """Synchronizes case with the National Crime and Criminal Tracking Network & Systems (CCTNS)."""
+    result = CCTNS_ICJS_Adapter.sync_to_cctns(db=db, case_id=case_id, user=user)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("message", "CCTNS sync failed"))
+    return result
+
+
+@router.get("/{case_id}/icjs-dossier")
+def get_case_icjs_dossier(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.read", "reports.generate")),
+    db: Session = Depends(get_db),
+):
+    """Generates Inter-operable Criminal Justice System (ICJS) e-Courts Digital Docket Bundle."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    evidence_items = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+    return CCTNS_ICJS_Adapter.generate_icjs_dossier(case=case, evidence_items=evidence_items)
+
+
+@router.post("/{case_id}/icjs-transmit")
+def transmit_case_to_icjs(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.write", "reports.generate")),
+    db: Session = Depends(get_db),
+):
+    """Transmits case chargesheet and verified electronic exhibits to e-Courts ICJS Gateway."""
+    result = CCTNS_ICJS_Adapter.transmit_to_icjs(db=db, case_id=case_id, user=user)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("message", "ICJS transmission failed"))
+    return result
+
+

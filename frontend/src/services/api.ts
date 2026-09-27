@@ -75,6 +75,15 @@ export const caseApi = {
     api.post(`/api/cases/${id}/archive`),
   toggleLegalHold: (id: number, data: { legal_hold: boolean; reason?: string }) =>
     api.post(`/api/cases/${id}/legal-hold`, data),
+  // National CCTNS & ICJS Integration
+  getCctnsPacket: (id: number) =>
+    api.get(`/api/cases/${id}/cctns-packet`),
+  syncCctns: (id: number) =>
+    api.post(`/api/cases/${id}/cctns-sync`),
+  getIcjsDossier: (id: number) =>
+    api.get(`/api/cases/${id}/icjs-dossier`),
+  transmitIcjs: (id: number) =>
+    api.post(`/api/cases/${id}/icjs-transmit`),
 };
 export const casesApi = caseApi;
 
@@ -149,6 +158,11 @@ export const evidenceApi = {
     api.post(`/api/evidence/${id}/court-action`, data),
   authorizedDestruction: (id: number | string, data: { destruction_authority: string; destruction_method: string; notes?: string }) =>
     api.post(`/api/evidence/${id}/authorized-destruction`, data),
+  // Crime Scene GPS & EXIF Verification
+  verifyExif: (id: number | string) =>
+    api.post(`/api/evidence/${id}/verify-exif`),
+  getExif: (id: number | string) =>
+    api.get(`/api/evidence/${id}/exif`),
 };
 
 
@@ -197,15 +211,58 @@ export const publicApi = {
       throw err;
     }
   },
+  // Citizen FIR Status Portal
+  requestCitizenOtp: (fir_number: string, contact: string) =>
+    api.post('/api/public/citizen/request-otp', { fir_number, contact }),
+  verifyCitizenOtp: (session_id: string, otp: string) =>
+    api.post('/api/public/citizen/verify-otp', { session_id, otp }),
+  trackCitizenFir: (params: { access_token?: string; session_id?: string; fir_number?: string }) =>
+    api.get('/api/public/citizen/track-fir', { params }),
+  downloadCitizenFirPdf: (caseId: number) =>
+    api.get(`/api/public/citizen/fir-receipt/${caseId}/pdf`, { responseType: 'blob' }),
 };
 
 // --- AI API ---
-
 export const aiApi = {
   analyze: (evidenceId: number) =>
     api.post(`/api/ai/analyze/${evidenceId}`),
   getResults: (evidenceId: number) =>
     api.get(`/api/ai/results/${evidenceId}`),
+  // AI Case Assistant ("Ask the Case")
+  askTheCase: (data: { case_id: number; question: string }) =>
+    api.post('/api/ai/ask-the-case', data),
+  getContradictions: (caseId: number) =>
+    api.get(`/api/ai/case-contradictions/${caseId}`),
+  getTimeline: (caseId: number) =>
+    api.get(`/api/ai/case-timeline/${caseId}`),
+};
+
+// --- Legal & Statutory Compliance API (BSA 2023 & DPDP Act) ---
+export const legalApi = {
+  searchBns: (query?: string, law_type?: string) =>
+    api.get('/api/legal/bns-mapper', { params: { query, law_type } }),
+  analyzeCharges: (text: string) =>
+    api.post('/api/legal/analyze-charges', { text }),
+  getBsaCert: (evidenceId: string | number) =>
+    api.get(`/api/legal/bsa-certificate/${evidenceId}`),
+  downloadBsaCertPdf: (evidenceId: string | number) =>
+    api.get(`/api/legal/bsa-certificate/${evidenceId}/pdf`, { responseType: 'blob' }),
+  downloadBsaCertificatePdf: (evidenceId: string | number) =>
+    api.get(`/api/legal/bsa-certificate/${evidenceId}/pdf`, { responseType: 'blob' }),
+  getCaseBsaDossier: (caseId: number) =>
+    api.get(`/api/legal/bsa-certificate/case/${caseId}`),
+  downloadCaseBsaDossierPdf: (caseId: number) =>
+    api.get(`/api/legal/bsa-certificate/case/${caseId}/pdf`, { responseType: 'blob' }),
+  downloadBsaCaseCertificatePdf: (caseId: number) =>
+    api.get(`/api/legal/bsa-certificate/case/${caseId}/pdf`, { responseType: 'blob' }),
+  redactTextDpdp: (text: string, victim_names?: string[], mask_style?: string) =>
+    api.post('/api/legal/dpdp/redact-text', { text, victim_names, mask_style }),
+  getSanitizedCaseRecord: (caseId: number) =>
+    api.get(`/api/legal/dpdp/redacted-case/${caseId}`),
+  downloadSanitizedCasePdf: (caseId: number) =>
+    api.get(`/api/legal/dpdp/redacted-case/${caseId}/pdf`, { responseType: 'blob' }),
+  downloadDpdpRedactedCasePdf: (caseId: number) =>
+    api.get(`/api/legal/dpdp/redacted-case/${caseId}/pdf`, { responseType: 'blob' }),
 };
 
 // --- Blockchain API ---

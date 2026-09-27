@@ -18,6 +18,8 @@ import UsersPage from './pages/UsersPage';
 import PublicVerifyPage from './pages/PublicVerifyPage';
 import { CourtDashboardPage } from './pages/CourtDashboardPage';
 import { CAPDemoPage } from './pages/CAPDemoPage';
+import LegalCompliancePage from './pages/LegalCompliancePage';
+import CitizenPortalPage from './pages/CitizenPortalPage';
 import RoleGuard from './components/RoleGuard';
 import './App.css';
 
@@ -91,6 +93,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/citizen-portal" element={<CitizenPortalPage />} />
+          <Route path="/track-fir" element={<CitizenPortalPage />} />
           <Route path="/verify/evidence/:evidenceId" element={<PublicVerifyPage />} />
           <Route path="/verify/case/:caseId" element={<PublicVerifyPage />} />
           <Route path="/verify/:id" element={<PublicVerifyPage />} />
@@ -99,6 +103,11 @@ function App() {
             <ProtectedRoute><Layout /></ProtectedRoute>
           }>
             <Route index element={<DashboardPage />} />
+            <Route path="legal" element={
+              <RoleGuard allowedRoles={['ADMIN', 'INVESTIGATOR', 'FORENSIC_OFFICER', 'LEGAL_OFFICER', 'AUDITOR']}>
+                <LegalCompliancePage />
+              </RoleGuard>
+            } />
             <Route path="cases" element={
               <RoleGuard allowedRoles={['INVESTIGATOR', 'FORENSIC_OFFICER', 'LEGAL_OFFICER', 'AUDITOR']}>
                 <CasesPage />

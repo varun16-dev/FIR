@@ -10,13 +10,14 @@ from app.routes.reports import router as reports_router
 from app.routes.public import router as public_router
 
 from app.routes.approvals import router as approvals_router
+from app.routes.legal import router as legal_router
+from app.routes.e3ee import router as e3ee_router
+from app.routes.notifications import router as notifications_router
 
 __all__ = [
     "auth_router", "cases_router", "evidence_router", "ai_router",
     "blockchain_router", "audit_router", "users_router",
     "dashboard_router", "reports_router", "public_router",
-    "approvals_router"
+    "approvals_router", "legal_router", "e3ee_router", "notifications_router"
 ]
 
-from app.routes.e3ee import router as e3ee_router
-from app.routes.notifications import router as notifications_router

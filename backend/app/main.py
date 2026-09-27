@@ -42,6 +42,8 @@ app.include_router(users_router)
 app.include_router(dashboard_router)
 app.include_router(reports_router)
 app.include_router(approvals_router)
+from app.routes.legal import router as legal_router
+app.include_router(legal_router)
 
 
 

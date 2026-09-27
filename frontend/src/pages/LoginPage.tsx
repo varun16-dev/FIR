@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { authApi } from '../services/api';
 import {
-  Fingerprint, Lock, Eye, EyeOff, UserCheck, KeyRound
+  Fingerprint, Lock, Eye, EyeOff, UserCheck, KeyRound, ShieldCheck
 } from 'lucide-react';
 
 const USER_PROFILES = [
@@ -148,6 +148,19 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+        </div>
+
+        {/* Citizen Services Public Portal Banner */}
+        <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-dark-800 to-vault-950/40 border border-emerald-500/20 text-center space-y-2">
+          <p className="text-xs text-dark-300 font-medium">Are you a complainant or victim tracking your FIR status?</p>
+          <button
+            type="button"
+            onClick={() => navigate('/citizen-portal')}
+            className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Citizen FIR Status Portal (Public OTP Tracker)
+          </button>
         </div>
       </div>
     </div>

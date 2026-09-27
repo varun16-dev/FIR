@@ -112,3 +112,65 @@ def get_ai_results(
         raise HTTPException(status_code=404, detail="No AI analysis found. Run analysis first.")
 
     return AIAnalysisOut.model_validate(ai)
+
+
+# =========================================================================
+# 2. AI Case Assistant ("Ask the Case") Endpoints
+# =========================================================================
+from pydantic import BaseModel
+from typing import Optional, List
+from app.services.case_assistant import CaseAssistantService
+from app.security.auth import require_any_permission
+
+
+class AskCaseRequest(BaseModel):
+    case_id: int
+    query: str
+
+
+@router.post("/ask-the-case")
+def ask_the_case(
+    req: AskCaseRequest,
+    user: User = Depends(require_any_permission("cases.read", "evidence.read")),
+    db: Session = Depends(get_db),
+):
+    """Interactive AI Assistant querying case facts, statement contradictions, and evidence."""
+    result = CaseAssistantService.ask_the_case(db=db, case_id=req.case_id, query=req.query)
+
+    create_audit_log(
+        db, user_id=user.id, user_email=user.email, role=user.role,
+        action="AI_ASK_THE_CASE", resource_type="CASE",
+        resource_id=str(req.case_id), details={"query": req.query[:100]}
+    )
+    return result
+
+
+@router.get("/case-contradictions/{case_id}")
+def get_case_contradictions(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.read", "evidence.read")),
+    db: Session = Depends(get_db),
+):
+    """Detects statement contradictions, temporal variances, and physical evidence mismatches."""
+    contradictions = CaseAssistantService.detect_contradictions(db=db, case_id=case_id)
+    return {
+        "case_id": case_id,
+        "total_contradictions": len(contradictions),
+        "contradictions": contradictions,
+    }
+
+
+@router.get("/case-timeline/{case_id}")
+def get_case_timeline(
+    case_id: int,
+    user: User = Depends(require_any_permission("cases.read", "evidence.read")),
+    db: Session = Depends(get_db),
+):
+    """Synthesizes chronological crime timeline from FIR, witness records, and evidence intake."""
+    timeline = CaseAssistantService.generate_timeline(db=db, case_id=case_id)
+    return {
+        "case_id": case_id,
+        "total_milestones": len(timeline),
+        "timeline": timeline,
+    }
+

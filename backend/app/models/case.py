@@ -42,6 +42,14 @@ class Case(Base):
     closed_by = Column(Integer, nullable=True)
     archived_at = Column(DateTime, nullable=True)
 
+    # National CCTNS & ICJS Integration
+    cctns_fir_number = Column(String(100), default="")
+    cctns_sync_status = Column(String(50), default="NOT_SYNCED")  # NOT_SYNCED, SYNCED, TRANSMITTED
+    cctns_last_synced = Column(DateTime, nullable=True)
+    icjs_cnr_number = Column(String(100), default="")
+    icjs_transmission_status = Column(String(50), default="NOT_TRANSMITTED")  # NOT_TRANSMITTED, TRANSMITTED_TO_ECOURTS, ACCEPTED_BY_MAGISTRATE
+    icjs_last_transmitted = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

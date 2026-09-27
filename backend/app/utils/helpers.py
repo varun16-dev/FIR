@@ -41,6 +41,12 @@ def create_audit_log(db: Session, user_id: int = None, user_email: str = "",
                      role: str = "", action: str = "", resource_type: str = "",
                      resource_id: str = "", ip_address: str = "127.0.0.1",
                      status: str = "SUCCESS", details: str = "", commit: bool = True):
+    import json
+    if isinstance(details, (dict, list)):
+        details_str = json.dumps(details)
+    else:
+        details_str = str(details) if details is not None else ""
+
     log = AuditLog(
         user_id=user_id,
         user_email=user_email,
@@ -50,7 +56,7 @@ def create_audit_log(db: Session, user_id: int = None, user_email: str = "",
         resource_id=resource_id,
         ip_address=ip_address,
         status=status,
-        details=details,
+        details=details_str,
     )
     
     log.timestamp = datetime.utcnow()

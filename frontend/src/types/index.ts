@@ -51,6 +51,11 @@ export interface Case {
   closed_by?: string | null;
   archived_at?: string | null;
   closure_checklist_json?: string | null;
+  // National CCTNS & ICJS Integration
+  cctns_synced?: boolean;
+  cctns_sync_id?: string | null;
+  icjs_transmitted?: boolean;
+  icjs_docket_ref?: string | null;
 }
 
 export interface Evidence {
@@ -94,6 +99,13 @@ export interface Evidence {
   lab_seal_intact?: boolean | null;
   lab_findings?: string | null;
   lab_analyst?: string | null;
+  // Feature 4: Crime Scene GPS & EXIF
+  exif_verified?: string | null;
+  exif_latitude?: number | null;
+  exif_longitude?: number | null;
+  exif_timestamp?: string | null;
+  exif_distance_meters?: number | null;
+  exif_raw_json?: string | null;
   // Stage 5 Court Presentation
   court_exhibit_number?: string | null;
   court_receipt_number?: string | null;

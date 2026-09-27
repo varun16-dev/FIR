@@ -6,7 +6,8 @@ import { RoleSwitcher } from '../components/RoleSwitcher';
 import {
   LayoutDashboard, FolderOpen, Shield,
   Blocks, ClipboardList, Users, LogOut, Search,
-  Bell, ChevronLeft, ChevronRight, Fingerprint, X, FileText, KeyRound, Gavel, Network
+  Bell, ChevronLeft, ChevronRight, Fingerprint, X, FileText, KeyRound, Gavel, Network,
+  Scale, ShieldCheck
 } from 'lucide-react';
 
 
@@ -49,6 +50,12 @@ const ALL_NAV_ITEMS: NavItemConfig[] = [
     icon: FileText,
     label: 'Case Reports',
     allowedRoles: ['INVESTIGATOR', 'FORENSIC_OFFICER', 'LEGAL_OFFICER'],
+  },
+  {
+    to: '/legal',
+    icon: Scale,
+    label: 'Legal & BNS Compliance',
+    allowedRoles: ['ADMIN', 'INVESTIGATOR', 'FORENSIC_OFFICER', 'LEGAL_OFFICER', 'AUDITOR'],
   },
   {
     to: '/blockchain',
@@ -242,6 +249,19 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {/* Public Citizen Portal Quick Link */}
+        <div className="p-2 border-t border-dark-700/50">
+          <NavLink
+            to="/citizen-portal"
+            target="_blank"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/40 border border-emerald-500/20 transition-all"
+            title="Public Citizen FIR Portal"
+          >
+            <ShieldCheck className={`w-4 h-4 flex-shrink-0 ${collapsed ? 'mx-auto' : ''}`} />
+            {!collapsed && <span>Citizen Portal ↗</span>}
+          </NavLink>
+        </div>
 
         {/* Collapse */}
         <button

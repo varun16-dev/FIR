@@ -133,6 +133,14 @@ class CaseOut(BaseModel):
     closed_by: Optional[int] = None
     archived_at: Optional[datetime] = None
 
+    # National CCTNS & ICJS Integration
+    cctns_fir_number: Optional[str] = ""
+    cctns_sync_status: Optional[str] = "NOT_SYNCED"
+    cctns_last_synced: Optional[datetime] = None
+    icjs_cnr_number: Optional[str] = ""
+    icjs_transmission_status: Optional[str] = "NOT_TRANSMITTED"
+    icjs_last_transmitted: Optional[datetime] = None
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     evidence_count: int = 0
@@ -226,6 +234,17 @@ class EvidenceOut(BaseModel):
     destruction_authority: Optional[str] = ""
     destruction_method: Optional[str] = ""
     is_destroyed: Optional[bool] = False
+
+    # Crime Scene GPS & EXIF Verification
+    exif_latitude: Optional[float] = None
+    exif_longitude: Optional[float] = None
+    exif_timestamp: Optional[datetime] = None
+    exif_device_make: Optional[str] = ""
+    exif_device_model: Optional[str] = ""
+    exif_verification_status: Optional[str] = "UNVERIFIED"
+    exif_distance_meters: Optional[float] = None
+    exif_time_delta_seconds: Optional[float] = None
+    exif_anomaly_notes: Optional[str] = ""
 
     class Config:
         from_attributes = True

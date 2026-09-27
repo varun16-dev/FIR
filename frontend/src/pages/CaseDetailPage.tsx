@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { caseApi, evidenceApi, publicApi } from '../services/api';
+import { caseApi, evidenceApi, publicApi, aiApi, legalApi } from '../services/api';
 import type { Case, Evidence } from '../types';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -25,6 +25,17 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Bot,
+  Sparkles,
+  AlertTriangle,
+  MessageSquare,
+  Send,
+  Scale,
+  Network,
+  SendHorizontal,
+  CalendarClock,
+  ShieldAlert,
+  FileCode,
 } from 'lucide-react';
 
 
@@ -38,7 +49,7 @@ export default function CaseDetailPage() {
   const [flowData, setFlowData] = useState<any>(null);
   const [graphNodes, setGraphNodes] = useState<any[]>([]);
   const [graphEdges, setGraphEdges] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'flow' | 'evidence'>('flow');
+  const [activeTab, setActiveTab] = useState<'flow' | 'evidence' | 'assistant' | 'integration'>('flow');
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -46,6 +57,31 @@ export default function CaseDetailPage() {
   const [uploadError, setUploadError] = useState('');
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [advancingStage, setAdvancingStage] = useState(false);
+
+  // Feature 2: AI Case Assistant ("Ask the Case")
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState<Array<{
+    q: string;
+    a: string;
+    sources?: string[];
+    confidence?: string;
+    contradictions_found?: number;
+  }>>([]);
+  const [contradictions, setContradictions] = useState<any[] | null>(null);
+  const [contradictionsLoading, setContradictionsLoading] = useState(false);
+  const [timeline, setTimeline] = useState<any[] | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+
+  // Feature 5: National CCTNS / ICJS Integration
+  const [syncingCctns, setSyncingCctns] = useState(false);
+  const [transmittingIcjs, setTransmittingIcjs] = useState(false);
+  const [syncActionMessage, setSyncActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [inspectPayload, setInspectPayload] = useState<{ title: string; json: any } | null>(null);
+
+  // Feature 1 & 3: Legal & DPDP Exports
+  const [exportingBsaPdf, setExportingBsaPdf] = useState(false);
+  const [exportingDpdpPdf, setExportingDpdpPdf] = useState(false);
 
   // Case QR Barcode modal state
   const [showCaseQr, setShowCaseQr] = useState(false);
@@ -95,6 +131,172 @@ export default function CaseDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // AI Case Assistant handlers
+  const handleAskQuestion = async (customQ?: string) => {
+    const q = customQ || chatQuestion;
+    if (!q.trim() || !caseData) return;
+    setChatLoading(true);
+    try {
+      const res = await aiApi.askTheCase({ case_id: caseData.id, question: q.trim() });
+      setChatHistory((prev) => [
+        {
+          q: q.trim(),
+          a: res.data.answer,
+          sources: res.data.evidence_sources,
+          confidence: res.data.confidence,
+          contradictions_found: res.data.contradictions_flagged?.length || 0,
+        },
+        ...prev,
+      ]);
+      setChatQuestion('');
+    } catch (err: any) {
+      console.error('Ask the case failed', err);
+      setChatHistory((prev) => [
+        {
+          q: q.trim(),
+          a: `AI Assistant analysis unavailable: ${err.response?.data?.detail || err.message}`,
+        },
+        ...prev,
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const loadContradictions = async () => {
+    if (!caseData) return;
+    setContradictionsLoading(true);
+    try {
+      const res = await aiApi.getContradictions(caseData.id);
+      setContradictions(res.data.contradictions || []);
+    } catch (err) {
+      console.error('Contradiction load failed', err);
+    } finally {
+      setContradictionsLoading(false);
+    }
+  };
+
+  const loadTimeline = async () => {
+    if (!caseData) return;
+    setTimelineLoading(true);
+    try {
+      const res = await aiApi.getTimeline(caseData.id);
+      setTimeline(res.data.timeline || []);
+    } catch (err) {
+      console.error('Timeline load failed', err);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  // CCTNS / ICJS handlers
+  const handleSyncCctns = async () => {
+    if (!caseData) return;
+    setSyncingCctns(true);
+    setSyncActionMessage(null);
+    try {
+      const res = await caseApi.syncCctns(caseData.id);
+      setSyncActionMessage({
+        text: `✓ Synchronized with National CCTNS CAS (Packet: ${res.data.cctns_sync_id})`,
+        type: 'success',
+      });
+      loadData();
+    } catch (err: any) {
+      setSyncActionMessage({
+        text: `✕ CCTNS Sync Failed: ${err.response?.data?.detail || err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setSyncingCctns(false);
+    }
+  };
+
+  const handleTransmitIcjs = async () => {
+    if (!caseData) return;
+    setTransmittingIcjs(true);
+    setSyncActionMessage(null);
+    try {
+      const res = await caseApi.transmitIcjs(caseData.id);
+      setSyncActionMessage({
+        text: `✓ Transmitted to e-Courts ICJS (Docket: ${res.data.icjs_docket_ref})`,
+        type: 'success',
+      });
+      loadData();
+    } catch (err: any) {
+      setSyncActionMessage({
+        text: `✕ ICJS Transmission Failed: ${err.response?.data?.detail || err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setTransmittingIcjs(false);
+    }
+  };
+
+  const handleInspectCctns = async () => {
+    if (!caseData) return;
+    try {
+      const res = await caseApi.getCctnsPacket(caseData.id);
+      setInspectPayload({
+        title: 'NCRB CCTNS CAS IIF-I/V Standardized Packet',
+        json: res.data,
+      });
+    } catch (err: any) {
+      alert(`Could not fetch CCTNS packet: ${err.message}`);
+    }
+  };
+
+  const handleInspectIcjs = async () => {
+    if (!caseData) return;
+    try {
+      const res = await caseApi.getIcjsDossier(caseData.id);
+      setInspectPayload({
+        title: 'Interoperable Criminal Justice System (ICJS) Judicial Exchange Dossier',
+        json: res.data,
+      });
+    } catch (err: any) {
+      alert(`Could not fetch ICJS dossier: ${err.message}`);
+    }
+  };
+
+  // PDF Export handlers
+  const handleExportBsaPdf = async () => {
+    if (!caseData) return;
+    setExportingBsaPdf(true);
+    try {
+      const res = await legalApi.downloadBsaCaseCertificatePdf(caseData.id);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BSA_Sec63_Dossier_${caseData.case_number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      alert(`Failed to export BSA Certificate Dossier: ${err.message}`);
+    } finally {
+      setExportingBsaPdf(false);
+    }
+  };
+
+  const handleExportDpdpPdf = async () => {
+    if (!caseData) return;
+    setExportingDpdpPdf(true);
+    try {
+      const res = await legalApi.downloadDpdpRedactedCasePdf(caseData.id);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `DPDP_Media_FIR_${caseData.case_number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      alert(`Failed to export DPDP Sanitized FIR: ${err.message}`);
+    } finally {
+      setExportingDpdpPdf(false);
+    }
+  };
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !id) return;
@@ -189,6 +391,24 @@ export default function CaseDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
+              onClick={handleExportBsaPdf}
+              disabled={exportingBsaPdf}
+              className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3 border border-amber-500/40 text-amber-300 hover:text-white transition-all shadow-sm"
+              title="Download Bharatiya Sakshya Adhiniyam Section 63 Electronic Certificate & Evidence Dossier"
+            >
+              <Scale className={`w-3.5 h-3.5 text-amber-400 ${exportingBsaPdf ? 'animate-spin' : ''}`} />
+              <span>{exportingBsaPdf ? 'Exporting...' : 'BSA Sec 63 Dossier (PDF)'}</span>
+            </button>
+            <button
+              onClick={handleExportDpdpPdf}
+              disabled={exportingDpdpPdf}
+              className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3 border border-emerald-500/40 text-emerald-300 hover:text-white transition-all shadow-sm"
+              title="Download DPDP Act 2023 Compliant Redacted Public / Media FIR Slip"
+            >
+              <ShieldAlert className={`w-3.5 h-3.5 text-emerald-400 ${exportingDpdpPdf ? 'animate-spin' : ''}`} />
+              <span>{exportingDpdpPdf ? 'Masking...' : 'DPDP Media FIR (PDF)'}</span>
+            </button>
+            <button
               onClick={() => openCaseQr()}
               className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3 border border-vault-500/40 text-vault-300 hover:text-white transition-all shadow-sm"
               title="View & Scan Case QR Code Barcode"
@@ -233,11 +453,21 @@ export default function CaseDetailPage() {
           <span className="flex items-center gap-1.5 font-semibold text-white">
             <Shield className="w-4 h-4 text-vault-400" /> Evidence Count: {evidence.length}
           </span>
+          {caseData.cctns_synced && (
+            <span className="flex items-center gap-1.5 text-xs text-blue-400 font-medium">
+              <Network className="w-3.5 h-3.5" /> CCTNS: {caseData.cctns_sync_id || 'SYNCED'}
+            </span>
+          )}
+          {caseData.icjs_transmitted && (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+              <Scale className="w-3.5 h-3.5" /> ICJS: {caseData.icjs_docket_ref || 'TRANSMITTED'}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-3 border-b border-dark-700/70 pb-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-dark-700/70 pb-2">
         <button
           onClick={() => setActiveTab('flow')}
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
@@ -263,6 +493,38 @@ export default function CaseDetailPage() {
           }`}
         >
           <Shield className="w-4 h-4 text-vault-400" /> Case Evidence Files ({evidence.length})
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('assistant');
+            if (!contradictions) loadContradictions();
+            if (!timeline) loadTimeline();
+          }}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+            activeTab === 'assistant'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+              : 'text-dark-400 hover:text-white hover:bg-dark-800/60'
+          }`}
+        >
+          <Bot className="w-4 h-4 text-purple-300" /> AI Case Assistant ("Ask the Case")
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-mono">
+            AI + Timeline
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('integration')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+            activeTab === 'integration'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+              : 'text-dark-400 hover:text-white hover:bg-dark-800/60'
+          }`}
+        >
+          <Network className="w-4 h-4 text-blue-300" /> National CCTNS / ICJS
+          {caseData.cctns_synced && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400" title="CCTNS Synced" />
+          )}
         </button>
       </div>
 
@@ -546,6 +808,527 @@ export default function CaseDetailPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: AI CASE ASSISTANT ("ASK THE CASE") */}
+      {activeTab === 'assistant' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="glass-card p-6 border-purple-500/30 bg-gradient-to-r from-purple-950/20 via-dark-800 to-dark-900">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30">
+                  <Bot className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    AI Case Assistant ("Ask the Case")
+                    <span className="px-2 py-0.5 rounded text-[11px] bg-purple-500/20 text-purple-300 font-mono">
+                      v2.0 Legal Copilot
+                    </span>
+                  </h2>
+                  <p className="text-xs text-dark-300 mt-0.5">
+                    Query witness statements, spot factual contradictions, and generate chronological crime timelines across all case evidence.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadContradictions}
+                  disabled={contradictionsLoading}
+                  className="btn-secondary text-xs flex items-center gap-1.5 py-1.5 px-3 border border-purple-500/30 text-purple-300 hover:text-white"
+                >
+                  <AlertTriangle className={`w-3.5 h-3.5 ${contradictionsLoading ? 'animate-spin' : ''}`} />
+                  <span>{contradictionsLoading ? 'Scanning...' : 'Re-scan Contradictions'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={loadTimeline}
+                  disabled={timelineLoading}
+                  className="btn-secondary text-xs flex items-center gap-1.5 py-1.5 px-3 border border-purple-500/30 text-purple-300 hover:text-white"
+                >
+                  <CalendarClock className={`w-3.5 h-3.5 ${timelineLoading ? 'animate-spin' : ''}`} />
+                  <span>{timelineLoading ? 'Synthesizing...' : 'Rebuild Timeline'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick suggested questions */}
+            <div className="mt-4 pt-4 border-t border-dark-700/60 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-dark-400 font-medium flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Suggested queries:
+              </span>
+              {[
+                'Are there contradictions between suspect alibi and crime scene evidence?',
+                'What weapons or physical artifacts were recovered?',
+                'Reconstruct the timeline of events from the witnesses.',
+                'What are the key charges under BNS 2023 for this offense?',
+              ].map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setChatQuestion(suggestion);
+                    handleAskQuestion(suggestion);
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-dark-800 hover:bg-purple-900/40 text-dark-300 hover:text-purple-200 border border-dark-700 hover:border-purple-500/30 transition-all text-[11px]"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+
+            {/* Interactive Query Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAskQuestion();
+              }}
+              className="mt-4 flex gap-2"
+            >
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={chatQuestion}
+                  onChange={(e) => setChatQuestion(e.target.value)}
+                  placeholder="Ask any question about this case (e.g. statement discrepancies, recovery memos, CCTV time delta)..."
+                  className="w-full px-4 py-2.5 bg-dark-900 border border-purple-500/30 rounded-lg text-white placeholder-dark-500 focus:outline-none focus:border-purple-400 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={chatLoading || !chatQuestion.trim()}
+                className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-purple-600/30 shrink-0"
+              >
+                {chatLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>Ask AI</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Chat History Q&A Results */}
+          {chatHistory.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-purple-400" /> Inquiry Answers ({chatHistory.length})
+              </h3>
+              <div className="space-y-3">
+                {chatHistory.map((item, idx) => (
+                  <div key={idx} className="glass-card p-5 border-dark-700/80 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-2.5">
+                        <div className="p-1.5 rounded-md bg-purple-600/20 text-purple-300 shrink-0 mt-0.5">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <p className="font-semibold text-white text-sm">{item.q}</p>
+                      </div>
+                      {item.confidence && (
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                          Confidence: {item.confidence}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-dark-900/80 border border-purple-500/20 text-dark-200 text-sm leading-relaxed whitespace-pre-line">
+                      {item.a}
+                    </div>
+
+                    {item.sources && item.sources.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-dark-800 text-xs text-dark-400">
+                        <span className="font-medium text-dark-300">Grounding Sources:</span>
+                        {item.sources.map((src, sIdx) => (
+                          <span key={sIdx} className="px-2 py-0.5 rounded bg-dark-800 border border-dark-700 text-vault-300 font-mono text-[11px]">
+                            {src}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Contradictions & Discrepancies Detector */}
+          <div className="glass-card p-6 border-amber-500/30">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" /> Statement Contradictions & Discrepancies Spotter
+                </h3>
+                <p className="text-xs text-dark-400 mt-0.5">
+                  Automated conflict detection across victim reports, suspect statements, forensic logs, and witness testimonies.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadContradictions}
+                disabled={contradictionsLoading}
+                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${contradictionsLoading ? 'animate-spin' : ''}`} /> Refresh Checks
+              </button>
+            </div>
+
+            {contradictionsLoading ? (
+              <div className="p-8 text-center text-dark-400 text-sm">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-400 mb-2" />
+                Scanning case statements for discrepancies...
+              </div>
+            ) : contradictions && contradictions.length > 0 ? (
+              <div className="space-y-3">
+                {contradictions.map((c, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-xl border ${
+                      c.severity === 'CRITICAL'
+                        ? 'bg-red-950/30 border-red-500/40 text-red-200'
+                        : c.severity === 'HIGH'
+                        ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                        : 'bg-dark-800 border-dark-700 text-dark-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            c.severity === 'CRITICAL'
+                              ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          {c.severity} CONTRADICTION
+                        </span>
+                        <span className="text-xs font-semibold text-white">{c.type || 'Discrepancy'}</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-dark-400">
+                        Sources: {Array.isArray(c.sources) ? c.sources.join(' vs ') : 'Cross-examination'}
+                      </span>
+                    </div>
+
+                    <p className="text-sm font-medium text-white mt-2 leading-relaxed">
+                      {c.description || c.statement_a + ' vs ' + c.statement_b}
+                    </p>
+
+                    {c.legal_relevance && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-dark-900/60 border border-dark-700/60 text-xs space-y-1">
+                        <span className="font-semibold text-amber-300 block">Court Admissibility Note:</span>
+                        <p className="text-dark-300">{c.legal_relevance}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-white">No Statement Contradictions Flagged</p>
+                <p className="text-xs text-dark-400 mt-1">
+                  Witness reports, suspect depositions, and seizure memos are currently corroborated by evidence logs.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Chronological Crime Timeline */}
+          <div className="glass-card p-6 border-blue-500/30">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-blue-400" /> Chronological Crime Timeline
+                </h3>
+                <p className="text-xs text-dark-400 mt-0.5">
+                  AI-synthesized chronology mapping incident progression from reported time to forensic verification.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadTimeline}
+                disabled={timelineLoading}
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${timelineLoading ? 'animate-spin' : ''}`} /> Refresh Timeline
+              </button>
+            </div>
+
+            {timelineLoading ? (
+              <div className="p-8 text-center text-dark-400 text-sm">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-400 mb-2" />
+                Synthesizing chronological milestones...
+              </div>
+            ) : timeline && timeline.length > 0 ? (
+              <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-blue-500/30">
+                {timeline.map((event, idx) => (
+                  <div key={idx} className="relative">
+                    <div className="absolute -left-6 top-1.5 w-4 h-4 rounded-full bg-blue-600 border-2 border-dark-900 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    </div>
+
+                    <div className="glass-card p-4 border-dark-700/80 hover:border-blue-500/40 transition-all">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-mono font-bold text-blue-400">
+                          {event.time || event.timestamp || 'Milestone ' + (idx + 1)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {event.phase && (
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-dark-800 text-dark-300 border border-dark-700 font-semibold">
+                              {event.phase}
+                            </span>
+                          )}
+                          {event.confidence && (
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                              {event.confidence}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-sm font-medium text-white mt-1.5 leading-relaxed">
+                        {event.event || event.description}
+                      </p>
+
+                      {event.evidence_source && (
+                        <p className="text-xs text-dark-400 mt-2 flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-vault-400" /> Grounded in: <span className="font-mono text-vault-300">{event.evidence_source}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-dark-400 text-xs">
+                No timeline records synthesized yet. Click "Rebuild Timeline" above.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: NATIONAL CCTNS / ICJS INTEGRATION */}
+      {activeTab === 'integration' && (
+        <div className="space-y-6">
+          {/* Status Message Banner */}
+          {syncActionMessage && (
+            <div
+              className={`p-4 rounded-xl border flex items-center justify-between ${
+                syncActionMessage.type === 'success'
+                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                  : 'bg-red-950/30 border-red-500/40 text-red-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                {syncActionMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                )}
+                <span>{syncActionMessage.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSyncActionMessage(null)}
+                className="text-xs opacity-70 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Integration Header */}
+          <div className="glass-card p-6 border-blue-500/30 bg-gradient-to-r from-blue-950/20 via-dark-800 to-dark-900">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                <Network className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  National CCTNS & ICJS Judicial Adapters
+                  <span className="px-2 py-0.5 rounded text-[11px] bg-blue-500/20 text-blue-300 font-mono">
+                    MoHA / NCRB Standardized
+                  </span>
+                </h2>
+                <p className="text-xs text-dark-300">
+                  Direct interoperability with India's Crime and Criminal Tracking Network & Systems (CCTNS) and Inter-operable Criminal Justice System (ICJS).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* CCTNS CAS Packet Card */}
+            <div className="glass-card p-6 border-dark-700/80 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[11px] font-mono uppercase text-blue-400 font-bold tracking-wider">
+                    Ministry of Home Affairs • NCRB
+                  </span>
+                  <h3 className="text-base font-bold text-white mt-1">CCTNS CAS Data Packet</h3>
+                  <p className="text-xs text-dark-400 mt-0.5">
+                    Standardized Integrated Investigation Form (IIF-I First Information & IIF-V Crime Detail) packet.
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    caseData.cctns_synced
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}
+                >
+                  {caseData.cctns_synced ? '✓ SYNCHRONIZED' : '● PENDING SYNC'}
+                </span>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-dark-900/60 border border-dark-700/60 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Sync Reference ID:</span>
+                  <span className="font-mono text-white font-semibold">{caseData.cctns_sync_id || 'Not Yet Synced'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Target Station Network:</span>
+                  <span className="text-dark-200">DL-ND-CONNAUGHT-CAS-01</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Standard Schema:</span>
+                  <span className="font-mono text-vault-300">NCRB CAS v4.2 JSON</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSyncCctns}
+                  disabled={syncingCctns}
+                  className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingCctns ? 'animate-spin' : ''}`} />
+                  <span>{syncingCctns ? 'Synchronizing...' : caseData.cctns_synced ? 'Re-Sync CCTNS Packet' : 'Sync to National CCTNS'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInspectCctns}
+                  className="py-2 px-3 rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-white font-semibold text-xs border border-dark-700 transition-all flex items-center gap-1.5"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Inspect IIF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ICJS e-Court Dossier Card */}
+            <div className="glass-card p-6 border-dark-700/80 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[11px] font-mono uppercase text-emerald-400 font-bold tracking-wider">
+                    e-Courts Mission Mode Project
+                  </span>
+                  <h3 className="text-base font-bold text-white mt-1">ICJS Judicial Dossier</h3>
+                  <p className="text-xs text-dark-400 mt-0.5">
+                    Inter-operable Criminal Justice System court docket transmission with blockchain cryptographic proof.
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    caseData.icjs_transmitted
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}
+                >
+                  {caseData.icjs_transmitted ? '✓ TRANSMITTED' : '● STAGED FOR COURT'}
+                </span>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-dark-900/60 border border-dark-700/60 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Judicial Docket Ref:</span>
+                  <span className="font-mono text-white font-semibold">{caseData.icjs_docket_ref || 'Awaiting Court Filing'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Jurisdiction Court Code:</span>
+                  <span className="text-dark-200">DL-HC-PATIALA-04</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Evidence Chain Proof:</span>
+                  <span className="font-mono text-emerald-300">BSA Sec 63 Embedded</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleTransmitIcjs}
+                  disabled={transmittingIcjs}
+                  className="flex-1 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 disabled:opacity-50"
+                >
+                  <SendHorizontal className={`w-3.5 h-3.5 ${transmittingIcjs ? 'animate-spin' : ''}`} />
+                  <span>{transmittingIcjs ? 'Transmitting...' : caseData.icjs_transmitted ? 'Re-Transmit to Court' : 'Transmit to ICJS Court'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInspectIcjs}
+                  className="py-2 px-3 rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-200 hover:text-white font-semibold text-xs border border-dark-700 transition-all flex items-center gap-1.5"
+                >
+                  <Scale className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Inspect Docket</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSON Payload Inspector Modal */}
+      {inspectPayload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="glass-card p-6 w-full max-w-3xl border-dark-700 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-dark-700 pb-3">
+              <div className="flex items-center gap-2">
+                <FileCode className="w-5 h-5 text-vault-400" />
+                <h3 className="text-sm font-bold text-white">{inspectPayload.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectPayload(null)}
+                className="text-dark-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-dark-950 p-4 rounded-xl border border-dark-800 font-mono text-xs text-dark-300">
+              <pre>{JSON.stringify(inspectPayload.json, null, 2)}</pre>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-dark-700">
+              <span className="text-xs text-dark-400">Standardized Interoperability Format compliant with MoHA guidelines.</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(inspectPayload.json, null, 2));
+                    alert('Copied standardized JSON payload to clipboard!');
+                  }}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                >
+                  Copy Payload JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectPayload(null)}
+                  className="btn-primary text-xs py-1.5 px-4"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

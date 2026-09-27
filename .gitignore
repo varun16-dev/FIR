@@ -30,9 +30,13 @@ SIH-main/evidence-vault/backend/storage/evidence/*
 !SIH-main/evidence-vault/backend/storage/evidence/demo_*
 !SIH-main/evidence-vault/backend/storage/evidence/.gitkeep
 
-# SQLite temporary files
+# SQLite temporary and backup files
 *.db-shm
 *.db-wal
+*.db-journal
+*.bak.db
+*.bak2.db
+test_*.db
 
 # Frontend Node dependencies & build artifacts
 node_modules/

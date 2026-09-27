@@ -92,6 +92,17 @@ class Evidence(Base):
     destruction_method = Column(String(255), default="")
     is_destroyed = Column(Boolean, default=False)
 
+    # Crime Scene GPS & EXIF Verification
+    exif_latitude = Column(Float, nullable=True)
+    exif_longitude = Column(Float, nullable=True)
+    exif_timestamp = Column(DateTime, nullable=True)
+    exif_device_make = Column(String(100), default="")
+    exif_device_model = Column(String(100), default="")
+    exif_verification_status = Column(String(50), default="UNVERIFIED")  # UNVERIFIED, VERIFIED, VICINITY_WARNING, MISMATCH_DISTANCE, MISMATCH_TIME, NO_EXIF
+    exif_distance_meters = Column(Float, nullable=True)
+    exif_time_delta_seconds = Column(Float, nullable=True)
+    exif_anomaly_notes = Column(Text, default="")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
